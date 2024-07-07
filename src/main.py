@@ -1,25 +1,22 @@
+from utils import *
+
 file  = open("../attacks/DOS_ATCK.txt", 'r')
 text = file.read()
 
-class CANMessage():
-    def __init__(self, time_stamp, id, payload, label):
-        self.time_stamp = time_stamp
-        self.id = id
-        self.payload = payload
-        self.label = label
-    
-    def __str__(self):
-        return f'{self.time_stamp} {self.id} {self.payload} {self.label}'
+filter = Filter(CommunicationMatrix('./communication_matrix.json'), threshold=2)
+countFake = 0
+countFiltered = 0
+# The Filter must never classify a normal message as an attack
+countIncorrect = 0
 
-ids = set()
-for i, line in enumerate(text.split('\n')):
-    v = line.split(' ')
-    time_stamp = v[0][1:-1]
-    id, _, payload = v[2].partition('#')
-    label = 'Attack' if v[3] == 'T' else 'Normal'
+for line in text.split('\n'):
+    msg = CANMsgFromline(line)
+    if msg is None: break
+    if msg.label == 'Attack':
+        countFake += 1
+        if filter.test(msg) == 'Attack':
+            countFiltered += 1
+    if filter.test(msg) == 'Attack' and msg.label == 'Normal':
+        countIncorrect += 1
 
-    mg = CANMessage(time_stamp, id, payload, label)
-    if label != 'Attack':
-        ids |= {id}
-
-print(ids)
+print(f'Fake: {countFake} Filtered: {countFiltered} Incorrect: {countIncorrect}')
