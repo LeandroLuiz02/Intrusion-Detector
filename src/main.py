@@ -1,6 +1,8 @@
 from utils import *
 
-file  = open("../attacks/DOS_ATCK.txt", 'r')
+attack_file = "../attacks/DOS_ATCK.txt"
+print(attack_file)
+file  = open(attack_file, 'r')
 text = file.read()
 
 filter = Filter(CommunicationMatrix('./communication_matrix.json'), threshold=2)
@@ -18,5 +20,9 @@ for line in text.split('\n'):
             countFiltered += 1
     if filter.test(msg) == 'Attack' and msg.label == 'Normal':
         countIncorrect += 1
+    # Analyze the first attack message that was not filtered
+    # if msg.label == 'Attack' and filter.test(msg) == 'Normal':
+    #     print(str(msg))
+    #     exit(0)
 
 print(f'Fake: {countFake} Filtered: {countFiltered} Incorrect: {countIncorrect}')
