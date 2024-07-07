@@ -44,7 +44,41 @@ class Filter():
         return msg.id in self.comm_matrix.matrix
 
     def check_payload_compatible(self, msg):
-        return True # TODO: Implement this
+        def get_val_at_bit_interval(signal, start, end):
+            mask = 0xFFFFFFFFFFFFFFFF # 64 bits, maximum length is 8 bytes
+            # Bring the start bit to the beginning
+            signal = signal >> start
+            # Create a mask with the desired length and invert it's bits
+            mask = (mask << (end - start)) ^ mask
+            # Apply the mask to the signal
+            return signal & mask
+
+        def calculate_payload_vals(payload, id_info):
+            s = 0 # Start index
+            e = 1 # End index
+            inter = 'bit_interval' # Just to make the code more readable
+            return [
+              # Get the value at the bit interval, apply the offset and factor
+              (get_val_at_bit_interval(payload, signal[inter][s], signal[inter][e]+1) + signal['offset']) * signal['factor']
+              for signal in id_info['signals']
+            ]
+
+        id_info = self.comm_matrix.matrix[msg.id] if self.check_id_exists(msg) else None
+        # Check if the id exists before checking the payload
+        if id_info is None:
+            return False
+
+        # Check if the payload length is compatible
+        is_len_compatible = id_info['length'] >= msg.p_len
+        if not is_len_compatible:
+            return False
+
+        # Check if the signal values are compatible, all signals must be in the range
+        signal_values = calculate_payload_vals(msg.payload, id_info)
+        return all([
+            (True if (signal_values[i] >= signal['min'] and signal_values[i] <= signal['max']) else False)
+            for i, signal in enumerate(id_info['signals']) 
+        ])
 
     def check_is_in_time(self, msg):
         return True # TODO: Implement this
