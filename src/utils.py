@@ -63,10 +63,7 @@ class Filter():
               for signal in id_info['signals']
             ]
 
-        id_info = self.comm_matrix.matrix[msg.id] if self.check_id_exists(msg) else None
-        # Check if the id exists before checking the payload
-        if id_info is None:
-            return False
+        id_info = self.comm_matrix.matrix[msg.id]
 
         # Check if the payload length is compatible
         is_len_compatible = id_info['length'] >= msg.p_len
@@ -84,11 +81,16 @@ class Filter():
         return True # TODO: Implement this
 
     def test(self, msg : CANMessage):
-        check_properties = [
-            self.check_id_exists(msg),
-            self.check_payload_compatible(msg),
-            self.check_is_in_time(msg)
-        ]
+        is_valid_id = self.check_id_exists(msg)
+        check_properties = [ is_valid_id ]
+
+        # Only make sense to check the payload
+        # and the time of some message if the id is valid
+        if is_valid_id:
+            check_properties.extend([
+                self.check_payload_compatible(msg),
+                self.check_is_in_time(msg) ])
+
         if all(check_properties):
             # Reset counter if message is normal
             self.cnt = 0
