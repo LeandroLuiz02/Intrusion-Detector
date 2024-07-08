@@ -35,10 +35,19 @@ def CANMsgFromline(line : str):
         return CANMessage(time_stamp, id, int(payload, 16), ceil(len(payload)/2), label)
 
 class Filter():
-    def __init__(self, comm_matrix : CommunicationMatrix, threshold = 3):
+    def __init__(self, comm_matrix : CommunicationMatrix, threshold = 3, enable_time = True, tolerance = 0.04):
         self.comm_matrix = comm_matrix
+        # Just some random big negative number to prevent the
+        # first message from being classified as an attack
+        self.prev_msg_time = {}
+        for id in self.comm_matrix.matrix:
+            self.prev_msg_time[id] = -0xFFFF
+        # Store if the last two messages were attacks or not
+        self.prev_msg_label = 'Normal'
+        self.acc = 0
+        self.enable_time = enable_time
         self.threshold = threshold
-        self.cnt = 0
+        self.tolerance = tolerance
 
     def check_id_exists(self, msg : CANMessage):
         return msg.id in self.comm_matrix.matrix
@@ -78,7 +87,12 @@ class Filter():
         ])
 
     def check_is_in_time(self, msg):
-        return True # TODO: Implement this
+        time = float(msg.time_stamp)
+        is_in_time = True
+        # Only check if the previous message was normal, possible attack coming
+        if self.prev_msg_label == 'Normal': 
+            is_in_time = (time - self.prev_msg_time[msg.id]) > self.tolerance
+        return is_in_time
 
     def test(self, msg : CANMessage):
         is_valid_id = self.check_id_exists(msg)
@@ -87,14 +101,22 @@ class Filter():
         # Only make sense to check the payload
         # and the time of some message if the id is valid
         if is_valid_id:
-            check_properties.extend([
-                self.check_payload_compatible(msg),
-                self.check_is_in_time(msg) ])
+            check_properties.append(self.check_payload_compatible(msg))
+            # Only uses the time as a property if the time check is enabled
+            if self.enable_time:
+                check_properties.append(self.check_is_in_time(msg))
 
         if all(check_properties):
-            # Reset counter if message is normal
-            self.cnt = 0
-            return 'Normal'
+            # Reset acc if message is normal
+            self.acc = 0
+            self.prev_msg_label = 'Normal'
         else:
-            self.cnt += sum(1 for x in check_properties if x is False)
-            return 'Attack' if self.cnt > self.threshold else 'Normal'
+            # Accumulate errors to classify the message
+            self.acc += sum(1 for x in check_properties if not x)
+            self.prev_msg_label = 'Attack' if self.acc > self.threshold else 'Normal'
+
+        # Saving the last normal message of this id
+        if self.prev_msg_label == 'Normal':
+            self.prev_msg_time[msg.id] = float(msg.time_stamp)
+
+        return self.prev_msg_label
