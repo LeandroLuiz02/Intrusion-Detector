@@ -32,5 +32,4 @@ EOS
 fi
 
 sudo ip link set can0 $mode
-open-bus.sh
 echo "can0 is: $(get_can0_status)"
