@@ -53,11 +53,11 @@ def parse_log_file(file_path, max_len=8):
     return data, labels
 
 def load_datasets():
-    normal_data, normal_labels = parse_log_file('../attacks/NORMAL_SAMPLES.txt')
-    dos_data, dos_labels = parse_log_file('../attacks/DOS_ATCK.txt')
-    falsifying_data, falsifying_labels = parse_log_file('../attacks/FALSIFYING_ATCK.txt')
-    fuzzing_data, fuzzing_labels = parse_log_file('../attacks/FUZZING_ATCK.txt')
-    impersonation_data, impersonation_labels = parse_log_file('../attacks/IMPERSONATION_ATCK.txt')
+    normal_data, normal_labels = parse_log_file('NORMAL_SAMPLES.txt')
+    dos_data, dos_labels = parse_log_file('DOS_ATCK.txt')
+    falsifying_data, falsifying_labels = parse_log_file('FALSIFYING_ATCK.txt')
+    fuzzing_data, fuzzing_labels = parse_log_file('FUZZING_ATCK.txt')
+    impersonation_data, impersonation_labels = parse_log_file('IMPERSONATION_ATCK.txt')
 
     data = normal_data + dos_data + falsifying_data + fuzzing_data + impersonation_data
     labels = normal_labels + dos_labels + falsifying_labels + fuzzing_labels + impersonation_labels
@@ -152,7 +152,7 @@ optimizer_G = optim.Adam(generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
 optimizer_D = optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
 import numpy as np
 
-n_epochs = 200
+n_epochs = 5
 sample_interval = 400
 cuda = True if torch.cuda.is_available() else False
 
