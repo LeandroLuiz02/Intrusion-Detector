@@ -1,7 +1,7 @@
 from utils import *
 from sys import argv
 
-attack_file = "../attacks/DOS_ATCK.txt" if argv[1] == "" else argv[1]
+attack_file = "../attacks/DOS_ATCK.txt" if len(argv) == 1 else argv[1]
 print(attack_file)
 file  = open(attack_file, 'r')
 text = file.read()

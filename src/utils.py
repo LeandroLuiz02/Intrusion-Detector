@@ -1,3 +1,15 @@
+# Função para ser utilizada com o método apply de PyTorch
+def weights_init_normal(m):
+    import torch
+    classname = m.__class__.__name__
+    # Verifica se a classe é convolucional
+    if classname.find("Conv") != -1:
+        torch.nn.init.normal_(m.weight.data, 0.0, 0.02)
+    # Verifica se a classe é BatchNorm2d
+    elif classname.find("BatchNorm2d") != -1:
+        torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
+        torch.nn.init.constant_(m.bias.data, 0.0)
+
 class CommunicationMatrix():
     def __init__(self, file_path):
         import json
