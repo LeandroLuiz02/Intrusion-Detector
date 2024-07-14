@@ -20,33 +20,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
+opt = get_cmd_args()
+
 # Usa o cuda se tiver disponivel
 cuda = True if torch.cuda.is_available() else False
 
-# Transformações
-transform = transforms.Compose([
-    transforms.Resize((opt.img_size, opt.img_size)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.5,], [0.5,])
-])
-
 # Criação do Dataset e DataLoader
 dataset = CANDataset([
-    ('../attacks/NORMAL_SAMPLES.txt', NORMAL_MSG),
     ('../attacks/DOS_ATCK.txt', DOS_MSG),
     ('../attacks/FUZZING_ATCK.txt', FUZZY_MSG),
     ('../attacks/FALSIFYING_ATCK.txt', FALS_MSG),
     ('../attacks/IMPERSONATION_ATCK.txt', IMP_MSG),
-], mirror_imgs=False, transform=transform)
+], opt, mirror_imgs=False, transform=transform)
 dataloader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=True)
-
-# Funções de perda
-
-# Binary Cross Entropy Loss, função de perda binária.
-adversarial_loss = torch.nn.BCELoss()
-
-# Cross Entropy Loss, função de perda de entropia cruzada. Usada auxiliarmente.
-auxiliary_loss = torch.nn.CrossEntropyLoss()
 
 # Inicializações
 
@@ -77,8 +63,10 @@ FloatTensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 # Cria um tensor de inteiros longos
 LongTensor = torch.cuda.LongTensor if cuda else torch.LongTensor
 
-
 # Treinamento
+prev_acc = 0 # Acuracia anterior
+acc = 0 # Acuracia
+cnt = 0 # Contador, para salvar o modelo com a melhor acuracia
 
 for epoch in range(opt.n_epochs):
     for i, (imgs, labels) in enumerate(dataloader):
@@ -131,15 +119,35 @@ for epoch in range(opt.n_epochs):
         pred = np.concatenate([real_aux.data.cpu().numpy(), fake_aux.data.cpu().numpy()], axis=0)
         gt = np.concatenate([labels.data.cpu().numpy(), gen_labels.data.cpu().numpy()], axis=0)
         d_acc = np.mean(np.argmax(pred, axis=1) == gt)
+        acc = (d_acc + acc*i) / (i+1)
 
         d_loss.backward()
         optimizer_D.step()
 
-        # Resultados
-        print(
-            "[Epoch %d/%d] [Batch %d/%d] [D loss: %f, acc: %d%%] [G loss: %f]"
-            % (epoch, opt.n_epochs, i, len(dataloader), d_loss.item(), 100 * d_acc, g_loss.item())
-        )
+        # Fim da iteração
+        if i % len(dataloader) == 0:
+            print(np.argmax(pred, axis=1))
+            if prev_acc < acc:
+                cnt = 0
+                prev_acc = acc
+                print('Saving model with accuracy: ', acc)
+                torch.save(generator.state_dict(), 'generator.pth')
+                torch.save(discriminator.state_dict(), 'discriminator.pth')
+            else:
+                # Se a acuracia não melhorar, incrementa o contador
+                # Se o contador chegar ao valor de patience, para o treinamento
+                print(f'Accuracy did not improve: {acc} <= {prev_acc}')
+                cnt += 1
+                if cnt == opt.patience:
+                    print('Early stopping')
+                    exit(0)
 
-torch.save(generator.state_dict(), 'generator.pth')
-torch.save(discriminator.state_dict(), 'discriminator.pth')
+        # Resultados
+        if i % 5 == 0:
+            print(
+                "[Epoch %d/%d] [Batch %d/%d] [D loss: %f, acc: %d%%] [G loss: %f]"
+                % (epoch, opt.n_epochs, i, len(dataloader), d_loss.item(), 100 * d_acc, g_loss.item())
+            )
+
+# torch.save(generator.state_dict(), 'generator.pth')
+# torch.save(discriminator.state_dict(), 'discriminator.pth')

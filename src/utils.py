@@ -1,3 +1,41 @@
+import torch
+import torchvision.transforms as transforms
+
+NORMAL_MSG='Normal'
+DOS_MSG='DoS'
+FALS_MSG='Falsifying'
+FUZZY_MSG='Fuzzy'
+IMP_MSG='Impersonating'
+
+# Classificação das mensagens
+MSGS_TYPES = {
+    NORMAL_MSG: 0,
+    DOS_MSG: 1,
+    FALS_MSG: 2,
+    FUZZY_MSG: 3,
+    IMP_MSG: 4,
+}
+
+# Transformações
+# TODO: get the img size from the parser
+transform = transforms.Compose([
+    transforms.Resize((32, 32)),
+    transforms.ToTensor(),
+    transforms.Normalize([0.5,], [0.5,])
+])
+
+# Funções de perda
+
+# Binary Cross Entropy Loss, função de perda binária.
+adversarial_loss = torch.nn.BCELoss()
+
+# Cross Entropy Loss, função de perda de entropia cruzada. Usada auxiliarmente.
+auxiliary_loss = torch.nn.CrossEntropyLoss()
+
+def get_cmd_args():
+    from parser import opt
+    return opt
+
 # Função para ser utilizada com o método apply de PyTorch
 def weights_init_normal(m):
     import torch
