@@ -17,7 +17,7 @@ def payload_convert_each_byte(payload):
         values.append(((payload >> (8 * i)) & 0xFF)/255.0)
     return values
 
-def payload_to_binary(payload): return list(map(int, bin(payload)[2:].zfill(32)))
+def payload_to_binary(payload): return list(map(int, bin(payload)[2:].zfill(32)[:32]))
 
 def create_can_image(can_messages, mirror=False):
     """

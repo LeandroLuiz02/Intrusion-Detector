@@ -3,26 +3,25 @@ import torchvision.transforms as transforms
 
 NORMAL_MSG='Normal'
 DOS_MSG='DoS'
-FALS_MSG='Falsifying'
 FUZZY_MSG='Fuzzy'
+FALS_MSG='Falsifying'
 IMP_MSG='Impersonating'
 
 # Classificação das mensagens
 MSGS_TYPES = {
     NORMAL_MSG: 0,
     DOS_MSG: 1,
-    FALS_MSG: 2,
-    FUZZY_MSG: 3,
+    FUZZY_MSG: 2,
+    FALS_MSG: 3,
     IMP_MSG: 4,
 }
 
 # Transformações
-# TODO: get the img size from the parser
-transform = transforms.Compose([
-    transforms.Resize((32, 32)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.5,], [0.5,])
-])
+get_transform = lambda size: transforms.Compose([
+        transforms.Resize((size, size)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.5,], [0.5,])
+    ])
 
 # Funções de perda
 
