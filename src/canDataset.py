@@ -30,6 +30,7 @@ class CANDataset():
             # Carrega o dataset
             with open(dataset, 'r') as file:
                 text = file.read()
+            self.msgs = []
             for i, line in enumerate(text.split('\n'), 1):
                 msg = CANMsgFromline(line)
                 if msg is None: break
