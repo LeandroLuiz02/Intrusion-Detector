@@ -25,22 +25,33 @@ class CANDataset():
         self.stride = stride
         self.mirror_imgs = mirror_imgs
         self.transform = transform
+        self.cnt = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 }
         for dataset, type_of_attack in datasets_and_type_of_attacks:
             print('Loading dataset:', dataset, 'with attack type:', type_of_attack)
             # Carrega o dataset
             with open(dataset, 'r') as file:
                 text = file.read()
-            self.msgs = []
             for i, line in enumerate(text.split('\n'), 1):
                 msg = CANMsgFromline(line)
                 if msg is None: break
                 msg.label = MSGS_TYPES[type_of_attack] if msg.label != 'Normal' else MSGS_TYPES[NORMAL_MSG]
                 self.msgs.append(msg)
-                if i % opt.dataset_max_size == 0: break
             if opt.pregenerate_imgs:
                 for i in range(0, len(self.msgs), stride):
                     current_msgs = self.msgs[i:i+window_size]
                     has_attack = any(msg.label != MSGS_TYPES[NORMAL_MSG] for msg in current_msgs)
+
+                    # Número máximo de ataques por classe
+                    if has_attack:
+                        if self.cnt[MSGS_TYPES[type_of_attack]] >= opt.dataset_max_size:
+                            break
+                        self.cnt[MSGS_TYPES[type_of_attack]] += 1
+                    # Número máximo de mensagens normais
+                    else:
+                        if self.cnt[MSGS_TYPES[NORMAL_MSG]] >= opt.dataset_max_size:
+                            continue
+                        self.cnt[MSGS_TYPES[NORMAL_MSG]] += 1
+
                     img = create_can_image(current_msgs, mirror=mirror_imgs)
                     # Aplica a transformação na imagem
                     if self.transform is not None:
@@ -50,7 +61,9 @@ class CANDataset():
                     # Adiciona a label desta imagem ao dataset
                     self.labels.append(MSGS_TYPES[type_of_attack] if has_attack else MSGS_TYPES[NORMAL_MSG])
 
-    def __len__(self): return len(self.msgs) // self.stride
+                self.msgs = []
+
+    def __len__(self): return len(self.msgs) // self.stride if not self.opt.pregenerate_imgs else len(self.imgs)
 
     def __getitem__(self, idx):
         if self.opt.pregenerate_imgs:
