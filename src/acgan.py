@@ -27,10 +27,14 @@ cuda = True if torch.cuda.is_available() else False
 
 # Criação do Dataset e DataLoader
 dataset = CANDataset([
-    ('../attacks/DOS_ATCK.txt', DOS_MSG),
-    ('../attacks/FUZZING_ATCK.txt', FUZZY_MSG),
-    ('../attacks/FALSIFYING_ATCK.txt', FALS_MSG),
-    ('../attacks/IMPERSONATION_ATCK.txt', IMP_MSG),
+    # ('../attacks/DOS_ATCK.txt', DOS_MSG),
+    # ('../attacks/FUZZING_ATCK.txt', FUZZY_MSG),
+    # ('../attacks/FALSIFYING_ATCK.txt', FALS_MSG),
+    # ('../attacks/IMPERSONATION_ATCK.txt', IMP_MSG),
+    ('../attacks/DOS_ATCK_balanced.txt', DOS_MSG),
+    ('../attacks/FUZZING_ATCK_balanced.txt', FUZZY_MSG),
+    ('../attacks/FALSIFYING_ATCK_balanced.txt', FALS_MSG),
+    ('../attacks/IMPERSONATION_ATCK_balanced.txt', IMP_MSG),
 ], opt, mirror_imgs=True, transform=get_transform(opt.img_size))
 dataloader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=True)
 
@@ -38,7 +42,8 @@ dataloader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=True)
 
 # Inializando o gerador e o descriminador
 generator = Generator(opt)
-discriminator = Discriminator(opt)
+# discriminator = Discriminator(opt)
+discriminator = DiscriminatorMLP(opt)
 
 # Verifica se o CUDA está disponível
 if cuda:

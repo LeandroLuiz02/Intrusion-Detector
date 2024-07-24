@@ -74,3 +74,35 @@ class Discriminator(nn.Module):
         # Retorna a saída do discriminador
         return validity, label
 
+# Classe para o Discriminador MLP do ACGAN
+
+class DiscriminatorMLP(nn.Module):
+    def __init__(self, opt):
+        super(DiscriminatorMLP, self).__init__()
+
+        self.label_emb = nn.Embedding(opt.n_classes, opt.latent_dim)
+
+        self.hidden_layer = nn.Sequential(
+            nn.Linear(opt.latent_dim + opt.n_classes, 256),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(256, 128),
+            nn.LeakyReLU(0.2, inplace=True),
+        )
+
+        self.adv_layer = nn.Sequential(
+            nn.Linear(128, 1),
+            nn.Sigmoid()
+        )
+
+        self.aux_layer = nn.Sequential(
+            nn.Linear(128, opt.n_classes),
+            nn.Softmax()
+        )
+
+    def forward(self, noise, labels):
+        gen_input = torch.cat((self.label_emb(labels), noise), -1)
+        out = self.hidden_layer(gen_input)
+        validity = self.adv_layer(out)
+        label = self.aux_layer(out)
+
+        return validity, label
