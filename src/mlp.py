@@ -1,6 +1,7 @@
 import pandas as pd
 import re
 import numpy as np
+import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import tensorflow as tf
@@ -17,6 +18,9 @@ from sklearn.model_selection import train_test_split
 from collections import Counter
 from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.model_selection import train_test_split, StratifiedKFold
+
+#NOT WORKING, THE MODEL DOES NOT SAVE PROPRIETLY
+#PROBABLY THE MODEL IS NOT SAVING THE WEIGHTS
 
 # Função para carregar e processar dados de um arquivo de texto
 def load_and_process_data(file_path):
@@ -50,6 +54,12 @@ def extract_features(message):
 
     return [id_int] + data_bytes
 
+# Carregar e processar os dados de mensagens normais
+normal_file_path = '../attacks/NORMAL_SAMPLES.txt'
+normal_data = load_and_process_data(normal_file_path)
+
+normal_file_path = '../attacks/NORMAL_SAMPLES(2).log'
+normal_data2 = load_and_process_data(normal_file_path)
 
 # Carregar e processar os dados de Fuzzing Attack
 fuzzing_file_path = '../attacks/FUZZING_ATCK.txt'
@@ -68,7 +78,7 @@ impersonation_file_path = '../attacks/IMPERSONATION_ATCK.txt'
 impersonation_data = load_and_process_data(impersonation_file_path)
 
 # Combinar os dados de Fuzzing e DOS Attack
-training_data = pd.concat([fuzzing_data, dos_data, falsifying_data, impersonation_data])
+training_data = pd.concat([fuzzing_data, dos_data, falsifying_data, impersonation_data, normal_data, normal_data2])
 training_features = np.array(training_data['message'].apply(extract_features).tolist())
 training_labels = np.array([1 if label == 'T' else 0 for label in training_data['label']])
 
@@ -144,6 +154,9 @@ plt.legend()
 plt.title('Loss over Epochs')
 
 plt.show()
+model.save('idsmodel.h5')
+np.save('X_train.npy', X_train)
+joblib.dump(scaler, 'scaler.pkl')
 
 # Carregar e processar os dados de validação
 dos_validation_file_path = '../attacks/validation/0-dos-candump-2024-07-10_184308.log'

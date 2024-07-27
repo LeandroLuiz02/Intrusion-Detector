@@ -9,11 +9,12 @@ class CommunicationMatrix():
         return ""
 
 class CANMessage():
-    def __init__(self, time_stamp, id, payload, p_len, label = None):
+    def __init__(self, time_stamp, id, payload, p_len, message, label = None):
         self.time_stamp = time_stamp
         self.id = id
         self.payload = payload
         self.p_len = p_len
+        self.message = message
         self.label = label
 
     def __str__(self):
@@ -23,6 +24,7 @@ class CANMessage():
     Time Stamp: {self.time_stamp}\n\
     Payload Length: {self.p_len}\n\
     Payload: {self.payload}\n\
+    Message: {self.message}\n\
     Label: {self.label if self.label is not None else 'Unknown'}"
 
 def CANMsgFromline(line : str):
@@ -31,8 +33,9 @@ def CANMsgFromline(line : str):
         words = line.split(' ')
         time_stamp = words[0][1:-1]
         id, _, payload = words[2].partition('#')
+        payload_hex = payload.encode('hex') if isinstance(payload, bytes) else payload
         label = ('Attack' if words[3] == 'T' else 'Normal') if len(words) == 4 else None
-        return CANMessage(time_stamp, id, int(payload, 16), ceil(len(payload)/2), label)
+        return CANMessage(time_stamp, id, int(payload, 16), ceil(len(payload)/2), payload_hex, label)
 
 class Filter():
     def __init__(self, comm_matrix : CommunicationMatrix, threshold = 3, enable_time = True, tolerance = 0.04):
