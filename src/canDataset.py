@@ -6,9 +6,25 @@ import torch
 from torchvision import transforms
 import numpy as np
 
+class DatasetClass():
+    def __init__(self):
+        self.imgs = []
+        self.labels = []
+    def __len__(self): return len(self.imgs)
+    def insert(self, img, label):
+        self.imgs.append(img)
+        self.labels.append(label)
+
+    def oversample(self, max_size):
+        ratio = max_size // len(self.imgs)
+        rest = max_size % len(self.imgs)
+        self.imgs = self.imgs * ratio + self.imgs[:rest]
+        self.labels = self.labels * ratio + self.labels[:rest]
+
 # Dataset personalizado
 class CANDataset():
-    def __init__(self, datasets_and_type_of_attacks : List[Tuple[str,str]], opt, window_size=5, stride=3, mirror_imgs=False, transform=None):
+
+    def __init__(self, datasets_and_type_of_attacks : List[Tuple[str,str]], opt, transform=None):
         '''
         Args:
         - datasets_and_type_of_attacks (List[str]): Lista de tuplas de strings, uma path e o tipo de ataque dele.
@@ -18,14 +34,19 @@ class CANDataset():
         - transform (callable, optional): Transformação a ser aplicada nas imagens.
         '''
         self.msgs = []
-        self.imgs = []
-        self.labels = []
+        # Contains the images and labels of each class of the dataset
+        self.samples = {
+            NORMAL_MSG: DatasetClass(),
+            DOS_MSG: DatasetClass(),
+            FUZZY_MSG: DatasetClass(),
+            FALS_MSG: DatasetClass(),
+            IMP_MSG: DatasetClass(),
+        }
         self.opt = opt
-        self.window_size = window_size
-        self.stride = stride
-        self.mirror_imgs = mirror_imgs
+        self.window_size = opt.window_size
+        self.stride = opt.stride
+        self.mirror_imgs = opt.mirror_img
         self.transform = transform
-        self.cnt = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 }
         for dataset, type_of_attack in datasets_and_type_of_attacks:
             print('Loading dataset:', dataset, 'with attack type:', type_of_attack)
             # Carrega o dataset
@@ -37,31 +58,36 @@ class CANDataset():
                 msg.label = MSGS_TYPES[type_of_attack] if msg.label != 'Normal' else MSGS_TYPES[NORMAL_MSG]
                 self.msgs.append(msg)
             if opt.pregenerate_imgs:
-                for i in range(0, len(self.msgs), stride):
-                    current_msgs = self.msgs[i:i+window_size]
+                for i in range(0, len(self.msgs), self.stride):
+                    current_msgs = self.msgs[i:i+self.window_size]
                     has_attack = any(msg.label != MSGS_TYPES[NORMAL_MSG] for msg in current_msgs)
 
                     # Número máximo de ataques por classe
-                    if has_attack:
-                        if self.cnt[MSGS_TYPES[type_of_attack]] >= opt.dataset_max_size:
-                            break
-                        self.cnt[MSGS_TYPES[type_of_attack]] += 1
+                    if has_attack and len(self.samples[type_of_attack]) >= opt.dataset_max_size:
+                        break
                     # Número máximo de mensagens normais
-                    else:
-                        if self.cnt[MSGS_TYPES[NORMAL_MSG]] >= opt.dataset_max_size:
-                            continue
-                        self.cnt[MSGS_TYPES[NORMAL_MSG]] += 1
+                    elif not has_attack and len(self.samples[NORMAL_MSG]) >= opt.dataset_max_size:
+                        continue
 
-                    img = create_can_image(current_msgs, mirror=mirror_imgs)
+                    img = create_can_image(current_msgs, mirror=self.mirror_imgs)
                     # Aplica a transformação na imagem
                     if self.transform is not None:
                         img = self.transform(img)
-                    # Adiciona a imagem do dataset
-                    self.imgs.append(img)
-                    # Adiciona a label desta imagem ao dataset
-                    self.labels.append(MSGS_TYPES[type_of_attack] if has_attack else MSGS_TYPES[NORMAL_MSG])
+
+                    # Adiciona a imagem e a label ao dataset da sua classe específica
+                    msg_label = type_of_attack if has_attack else NORMAL_MSG
+                    self.samples[msg_label].insert(img, MSGS_TYPES[msg_label])
 
                 self.msgs = []
+        if opt.pregenerate_imgs:
+            if not self.opt.test: self.oversample(500)
+            self.imgs = []
+            self.labels = []
+            for k, class_data in self.samples.items():
+                print(k)
+                print(len(class_data))
+                self.imgs += class_data.imgs
+                self.labels += class_data.labels
 
     def __len__(self): return len(self.msgs) // self.stride if not self.opt.pregenerate_imgs else len(self.imgs)
 
@@ -69,6 +95,15 @@ class CANDataset():
         if self.opt.pregenerate_imgs:
             return self.get_item_with_preprocessing(idx)
         return self.get_item_without_preprocessing(idx)
+
+    def oversample(self, max_size):
+        if self.opt.pregenerate_imgs:
+            for class_data in self.samples.values():
+                if len(class_data) > max_size or len(class_data) == 0: continue
+                class_data.oversample(max_size)
+        else:
+            print('Oversampling not supported for non pregenerated images')
+            exit(0)
 
     def get_item_without_preprocessing(self, idx):
         idx *= self.stride

@@ -47,6 +47,15 @@ def weights_init_normal(m):
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
 
+def setseed(seed):
+    import random
+    import torch
+    import numpy as np
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    np.random.seed(seed)
+
 class CommunicationMatrix():
     def __init__(self, file_path):
         import json

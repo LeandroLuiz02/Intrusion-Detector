@@ -85,7 +85,7 @@ def trainGan(datasets_and_types_of_attacks, opt = get_cmd_args(), model_file_nam
     cuda = True if torch.cuda.is_available() else False
 
     # Criação do Dataset e DataLoader
-    dataset = CANDataset(datasets_and_types_of_attacks, opt, mirror_imgs=opt.mirror_img, transform=get_transform(opt.img_size), window_size=8, stride=4)
+    dataset = CANDataset(datasets_and_types_of_attacks, opt, transform=get_transform(opt.img_size))
 
     len_dataset = len(dataset)
     train_size = int(0.70 * len_dataset)

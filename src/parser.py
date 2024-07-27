@@ -18,6 +18,8 @@ parser.add_argument("--sample_interval", type=int, default=400, help="interval b
 parser.add_argument("--patience", type=int, default=5, help="patience for early stopping")
 parser.add_argument("--tolerance", type=int, default=0.01, help="tolerance for early stopping")
 parser.add_argument("--dataset_max_size", type=int, default=2e5, help="maximum number of samples for each dataset")
+parser.add_argument("--window_size", type=int, default=8, help="maximum number of samples for each dataset")
+parser.add_argument("--stride", type=int, default=4, help="maximum number of samples for each dataset")
 parser.add_argument("--pregenerate_imgs", type=bool, default=False, help="If True, pregenerate images, to avoid generating them every time")
 parser.add_argument("--mirror_img", type=bool, default=False, help="If True, mirror images, to increase information")
 parser.add_argument("--test", type=bool, default=False, help="If True, test the model")
