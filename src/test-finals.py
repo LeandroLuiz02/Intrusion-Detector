@@ -26,7 +26,7 @@ def extract_features(message):
 model = load_model('idsmodel.h5')
 
 # Carregar o escalador e usar os dados de treinamento para ajustá-lo
-# Erro provavelmente aqui
+# ERRO PROVAVELMENTE AQUI 👇
 scaler = joblib.load('scaler.pkl')
 #scaler = StandardScaler()
 #X_train_load = np.load('X_train.npy')
