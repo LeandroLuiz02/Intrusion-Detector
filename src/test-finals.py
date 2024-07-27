@@ -26,12 +26,14 @@ def extract_features(message):
 model = load_model('idsmodel.h5')
 
 # Carregar o escalador e usar os dados de treinamento para ajustá-lo
+# Erro provavelmente aqui
 scaler = joblib.load('scaler.pkl')
-X_train_load = np.load('X_train.npy')
-X_train = scaler.fit_transform(X_train_load)
+#scaler = StandardScaler()
+#X_train_load = np.load('X_train.npy')
+#X_train = scaler.fit_transform(X_train_load)
 
 # Ler o arquivo de ataques
-attack_file = "../attacks/validation/0-dos-candump-2024-07-10_184308.log" if len(argv) == 1 else argv[1]
+attack_file = "../attacks/validation/2-fuzzing-candump-2024-07-10_184609.log" if len(argv) == 1 else argv[1]
 print(f"Lendo arquivo de ataques: {attack_file}")
 #print(attack_file)
 with open(attack_file, 'r') as file:
