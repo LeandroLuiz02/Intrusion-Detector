@@ -1,2 +1,2 @@
-NORMAL_SAMPLES(2).log
-X_train.npy
+attacks/NORMAL_SAMPLES(2).log
+src/X_train.npy
