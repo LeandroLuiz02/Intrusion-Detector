@@ -93,7 +93,8 @@ def CANMsgFromline(line : str):
         return CANMessage(time_stamp, id, int(payload, 16), ceil(len(payload)/2), label)
 
 class Filter():
-    def __init__(self, comm_matrix : CommunicationMatrix, threshold = 3, enable_time = True, tolerance = 0.04):
+    def __init__(self, comm_matrix : CommunicationMatrix,
+                 window_size = 8, stride = 4,threshold = 3, enable_time = True, tolerance = 0.04):
         self.comm_matrix = comm_matrix
         # Just some random big negative number to prevent the
         # first message from being classified as an attack
@@ -103,9 +104,12 @@ class Filter():
         # Store if the last two messages were attacks or not
         self.prev_msg_label = 'Normal'
         self.acc = 0
+        self.windown_size = window_size
+        self.stride = stride
         self.enable_time = enable_time
         self.threshold = threshold
         self.tolerance = tolerance
+        self.current_window = []
 
     def check_id_exists(self, msg : CANMessage):
         return msg.id in self.comm_matrix.matrix
@@ -152,29 +156,43 @@ class Filter():
             is_in_time = (time - self.prev_msg_time[msg.id]) > self.tolerance
         return is_in_time
 
-    def test(self, msg : CANMessage):
-        is_valid_id = self.check_id_exists(msg)
-        check_properties = [ is_valid_id ]
+    def test(self, msg : CANMessage, debug=False):
+        self.current_window.append(msg)
+        # Check if the window size is correct
+        if len(self.current_window) != self.windown_size:
+            return None
 
-        # Only make sense to check the payload
-        # and the time of some message if the id is valid
-        if is_valid_id:
-            check_properties.append(self.check_payload_compatible(msg))
-            # Only uses the time as a property if the time check is enabled
+        label = 'Normal'
+        t = 0
+        seen_ids = dict()
+        for i, m in enumerate(self.current_window):
+            if debug: print(f"Testing message {i+1} of the window")
             if self.enable_time:
-                check_properties.append(self.check_is_in_time(msg))
+                #Check if some other message with the same id of the current message appeared before
+                # and if the time difference is less than the tolerance
+                if m.id in seen_ids and float(m.time_stamp) - seen_ids[m.id] < self.tolerance:
+                    if debug:
+                        print(f"Time difference between messages with {m.id} is less than the tolerance")
+                        print(f"Time difference: {float(m.time_stamp) - seen_ids[m.id]}")
+                    t += 1
+                else:
+                    if debug: print(f"Adding id {m.id} to the seen ids")
+                    seen_ids[m.id] = float(m.time_stamp)
 
-        if all(check_properties):
-            # Reset acc if message is normal
-            self.acc = 0
-            self.prev_msg_label = 'Normal'
-        else:
-            # Accumulate errors to classify the message
-            self.acc += sum(1 for x in check_properties if not x)
-            self.prev_msg_label = 'Attack' if self.acc > self.threshold else 'Normal'
+            # Check for valid id
+            if not self.check_id_exists(m):
+                if debug: print("Invalid id")
+                t += 1
+            # Check for valid payload
+            elif not self.check_payload_compatible(m):
+                if debug: print("Invalid payload")
+                t += 1
 
-        # Saving the last normal message of this id
-        if self.prev_msg_label == 'Normal':
-            self.prev_msg_time[msg.id] = float(msg.time_stamp)
+            if t >= self.threshold:
+                if debug: print("Threshold reached")
+                label = 'Attack'
+                break
 
-        return self.prev_msg_label
+        # Reset the window
+        self.current_window = self.current_window[self.stride:]
+        return label
