@@ -1,5 +1,12 @@
+from operator import is_
 import torch
 import torchvision.transforms as transforms
+from ganClasses import Discriminator
+from torch.autograd import Variable
+from image import create_can_image
+from utils import *
+from typing import List
+import numpy as np
 
 NORMAL_MSG='Normal'
 DOS_MSG='DoS'
@@ -14,6 +21,15 @@ MSGS_TYPES = {
     FUZZY_MSG: 2,
     FALS_MSG: 3,
     IMP_MSG: 4,
+}
+
+# Valores para o tipo de mensagem
+MSGS_TYPES_VALUES = {
+    0: NORMAL_MSG,
+    1: DOS_MSG,
+    2: FUZZY_MSG,
+    3: FALS_MSG,
+    4: IMP_MSG,
 }
 
 # Transformações
@@ -94,7 +110,7 @@ def CANMsgFromline(line : str):
 
 class Filter():
     def __init__(self, comm_matrix : CommunicationMatrix,
-                 window_size = 8, stride = 4,threshold = 3, enable_time = True, tolerance = 0.04):
+                 window_size = 8, threshold = 3, enable_time = True, tolerance = 0.04):
         self.comm_matrix = comm_matrix
         # Just some random big negative number to prevent the
         # first message from being classified as an attack
@@ -105,11 +121,9 @@ class Filter():
         self.prev_msg_label = 'Normal'
         self.acc = 0
         self.windown_size = window_size
-        self.stride = stride
         self.enable_time = enable_time
         self.threshold = threshold
         self.tolerance = tolerance
-        self.current_window = []
 
     def check_id_exists(self, msg : CANMessage):
         return msg.id in self.comm_matrix.matrix
@@ -156,16 +170,14 @@ class Filter():
             is_in_time = (time - self.prev_msg_time[msg.id]) > self.tolerance
         return is_in_time
 
-    def test(self, msg : CANMessage, debug=False):
-        self.current_window.append(msg)
+    def test(self, msgs : List[CANMessage], debug=False):
         # Check if the window size is correct
-        if len(self.current_window) != self.windown_size:
+        if len(msgs) != self.windown_size:
             return None
 
-        label = 'Normal'
         t = 0
         seen_ids = dict()
-        for i, m in enumerate(self.current_window):
+        for i, m in enumerate(msgs):
             if debug: print(f"Testing message {i+1} of the window")
             if self.enable_time:
                 #Check if some other message with the same id of the current message appeared before
@@ -190,9 +202,79 @@ class Filter():
 
             if t >= self.threshold:
                 if debug: print("Threshold reached")
-                label = 'Attack'
-                break
+                return 'Attack'
 
-        # Reset the window
-        self.current_window = self.current_window[self.stride:]
-        return label
+        return 'Normal'
+
+def runGan(img, discriminator, opt = get_cmd_args(), cuda=True):
+    # Cria um tensor de ponto flutuante
+    FloatTensor = torch.FloatTensor
+
+    # Configuração da entrada
+    real_imgs = Variable(img.type(FloatTensor))
+
+    # Passa as imagens reais pelo discriminador para obter a validade
+    real_pred, real_aux = discriminator(real_imgs)
+
+    # Calcula a acuracia do descriminador
+    pred = real_aux.data.cpu().numpy()
+
+    return np.argmax(pred, axis=1)[0]
+
+class IDS:
+    def __init__(self, filter : Filter, model : Discriminator, opt, window_size = 8, stride = 4):
+        self.filter = filter
+        self.model = model
+        self.window_size = window_size
+        self.stride = stride
+        self.win = []
+        self.opt = opt
+        self.transform = get_transform(opt.img_size)
+        self.correct = 0
+        self.count = {
+            NORMAL_MSG: [0, 0],
+            DOS_MSG: [0, 0],
+            FUZZY_MSG: [0, 0],
+            FALS_MSG: [0, 0],
+            IMP_MSG: [0, 0],
+            'Filtered Attack': [0, 0]
+        }
+
+    def get_accuracy(self):
+        for k, v in self.count.items():
+            print(f"{k}:")
+            print(f"\tCorrect: {v[0]}")
+            print(f"\tIncorrect: {v[1]}")
+
+    def test(self, msg : CANMessage):
+        self.win.append(msg)
+        if len(self.win) != self.window_size:
+            return None
+
+        label = 'Normal'
+
+        # Pass the window to the filter
+        result = self.filter.test(self.win)
+        if result == 'Attack':
+            label = 'Filtered Attack'
+        elif result == 'Normal':
+            # Run the GAN model
+            img = self.transform(create_can_image(self.win, mirror=self.opt.mirror_img))
+            # Turning the image into a batch of size 1
+            img = torch.unsqueeze(img, 0)
+
+            label = MSGS_TYPES_VALUES[ runGan(img, self.model, self.opt) ]
+
+        is_attack = any(m.label != MSGS_TYPES[NORMAL_MSG] for m in self.win)
+        # for m in self.win:
+        #     print(str(m))
+        # print(is_attack)
+        # print(label)
+        predicted_attack = label != 'Normal'
+        if (not is_attack and not predicted_attack) or (is_attack and predicted_attack):
+            # print(f"Predicted: {label}, Real: {'Attack' if is_attack else 'Normal'}")
+            self.count[label][0] += 1
+        else:
+            self.count[label][1] += 1
+
+        self.win = self.win[self.stride:]

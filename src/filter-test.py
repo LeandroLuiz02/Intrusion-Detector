@@ -15,7 +15,6 @@ opt = get_cmd_args()
 # Show how the time works without the check for the previous message being normal(utils line 93)
 filter = Filter(CommunicationMatrix('./communication_matrix.json'),
                 window_size = opt.window_size,
-                stride = opt.stride,
                 threshold=2,
                 tolerance=4e-2,
                 enable_time=False)

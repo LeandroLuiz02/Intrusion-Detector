@@ -80,7 +80,7 @@ class CANDataset():
 
                 self.msgs = []
         if opt.pregenerate_imgs:
-            if not self.opt.test: self.oversample(500)
+            if not self.opt.test: self.oversample(opt.dataset_max_size//5)
             self.imgs = []
             self.labels = []
             for k, class_data in self.samples.items():
