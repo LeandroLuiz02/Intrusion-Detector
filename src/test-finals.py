@@ -56,13 +56,6 @@ for line in msgs:
     if msg.label is None:
         print('Unknown label')
         continue
-    #if msg is None:
-    #    print(f"Mensagem inválida: {line}")
-    #    continue
-    #if msg.label is None:
-    #    print(f"Rótulo desconhecido para a mensagem: {line}")
-    #    continue
-    #print(f"Processando mensagem: {msg.message} com rótulo: {msg.label}")
 
     # Testar a mensagem com o filtro
     filter_result = filter.test(msg)
