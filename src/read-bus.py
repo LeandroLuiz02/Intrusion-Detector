@@ -50,10 +50,7 @@ def main():
                 while True:
                         msg = CANMsgFromBus(bus.recv())
                         msgmlp = process_single_message(bus.recv())
-                        print(str(msg))
-                        print("Filter test:")
                         filter_result = filter.test(msg)
-                        print(filter.test(msg))
 
                         if filter_result == 'Normal':
                                 extract = extract_features(msgmlp['message'][0])
