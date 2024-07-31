@@ -246,7 +246,7 @@ class IDS:
             print(f"\tCorrect: {v[0]}")
             print(f"\tIncorrect: {v[1]}")
 
-    def test(self, msg : CANMessage):
+    def test(self, msg : CANMessage, debug=False):
         self.win.append(msg)
         if len(self.win) != self.window_size:
             return None
@@ -265,16 +265,14 @@ class IDS:
 
             label = MSGS_TYPES_VALUES[ runGan(img, self.model, self.opt) ]
 
-        is_attack = any(m.label != MSGS_TYPES[NORMAL_MSG] for m in self.win)
-        # for m in self.win:
-        #     print(str(m))
-        # print(is_attack)
-        # print(label)
-        predicted_attack = label != 'Normal'
-        if (not is_attack and not predicted_attack) or (is_attack and predicted_attack):
-            # print(f"Predicted: {label}, Real: {'Attack' if is_attack else 'Normal'}")
-            self.count[label][0] += 1
-        else:
-            self.count[label][1] += 1
+        if debug:
+            is_attack = any(m.label != MSGS_TYPES[NORMAL_MSG] for m in self.win)
+            predicted_attack = label != 'Normal'
+            if (not is_attack and not predicted_attack) or (is_attack and predicted_attack):
+                # print(f"Predicted: {label}, Real: {'Attack' if is_attack else 'Normal'}")
+                self.count[label][0] += 1
+            else:
+                self.count[label][1] += 1
 
         self.win = self.win[self.stride:]
+        return label

@@ -14,14 +14,31 @@ def main():
         ch = "can0"
 
         bus = interface.Bus(channel=ch, interface=inter)
-        filter = Filter(CommunicationMatrix('./communication_matrix.json'), threshold=2, tolerance=0.03, enable_time=False)
+
+        opt = get_cmd_args()
+        setseed(42)
+
+        gan = Discriminator(opt)
+        gan.load_state_dict(torch.load('./model.pth'))
+        gan.eval()
+
+        ids = IDS(
+            filter=Filter(
+                CommunicationMatrix('./communication_matrix.json'),
+                window_size=opt.window_size,
+                threshold=2,
+                tolerance=2e-4,
+                enable_time=False
+            ),
+            model=gan,
+            opt=opt)
 
         try:
                 while True:
                         msg = CANMsgFromBus(bus.recv())
-                        print(str(msg))
-                        print("Filter test:")
-                        print(filter.test(msg))
+                        res = ids.test(msg)
+                        if res is not None:
+                                print(res)
 
         except KeyboardInterrupt:
                 print("interrupted by user")
