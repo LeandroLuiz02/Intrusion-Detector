@@ -21,7 +21,7 @@ elif [ "$1"  == "close" ] && [ $cur_status == "open" ]; then
         mode="down"
 elif [ "$1" == "open" ] && [ $cur_status == "closed" ]; then
   mode="up type can bitrate 500000"
-elif [ $cur_status == "closed" ]; then
+else
   cat << EOS 
   usage:
     sudo ./open-bus.sh open    # open can0 without loopback

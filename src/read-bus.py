@@ -19,7 +19,7 @@ def main():
         setseed(42)
 
         gan = Discriminator(opt)
-        gan.load_state_dict(torch.load('./model.pth'))
+        gan.load_state_dict(torch.load('./model.pth', map_location='cpu'))
         gan.eval()
 
         ids = IDS(
@@ -34,11 +34,16 @@ def main():
             opt=opt)
 
         try:
+                print('Reading the bus...')
+                print('Press Ctrl+C to exit')
                 while True:
                         msg = CANMsgFromBus(bus.recv())
                         res = ids.test(msg)
                         if res is not None:
                                 print(res)
+                        # If loopback is activated, discard duplicate messages
+                        if opt.loop:
+                                bus.recv()
 
         except KeyboardInterrupt:
                 print("interrupted by user")
