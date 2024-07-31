@@ -18,14 +18,14 @@ def extract_features(message):
 
     return [id_int] + data_bytes
 
-def process_single_message(message):
-    match = re.match(r'\(\d+\.\d+\)\s+can0\s+(\S+)', message)
-    if match:
-        message_part = match.group(1)
-        data = pd.DataFrame({'message': [message_part]})
+# Processa a mensagem CAN recebida e retorna um DataFrame
+def process_single_message(msg):
+        id = (hex(msg.arbitration_id))[2:].upper()
+        pad_id = ((3-len(id)) * '0') + id if len(id) != 3 else id
+        d = ''.join(format(byte, '02x') for byte in msg.data).upper()
+        message = f'{pad_id}#{d}'
+        data = pd.DataFrame({'message': [message]})
         return data
-    else:
-        return pd.DataFrame({'message': []})
 
 def CANMsgFromBus(msg):
         id = (hex(msg.arbitration_id))[2:].upper()
