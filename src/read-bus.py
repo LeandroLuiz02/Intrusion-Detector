@@ -1,19 +1,31 @@
 from can import *
 from utils import *
 import numpy as np
+import pandas as pd
+import re
 import joblib
 from tensorflow.keras.models import load_model
 
-#NOT WORKING, THE MODEL DOES NOT SAVE PROPRIETLY
-#PROBABLY THE MODEL IS NOT SAVING THE WEIGHTS
+def extract_features(message):
+    parts = re.split('[#]', message)
+    id_hex = parts[0]
+    data_hex = parts[1] if len(parts) > 1 else ''
 
-# Carregar o modelo treinado
-model = load_model('idsmodel.h5')
+    id_int = int(id_hex, 16)
+    data_bytes = [int(data_hex[i:i+2], 16) for i in range(0, len(data_hex), 2)]
 
-# Carregar o escalador e usar os dados de treinamento para ajustá-lo
-scaler = joblib.load('scaler.pkl')
-X_train_load = np.load('X_train.npy')
-X_train = scaler.fit_transform(X_train_load)
+    data_bytes += [0] * (8 - len(data_bytes))
+
+    return [id_int] + data_bytes
+
+def process_single_message(message):
+    match = re.match(r'\(\d+\.\d+\)\s+can0\s+(\S+)', message)
+    if match:
+        message_part = match.group(1)
+        data = pd.DataFrame({'message': [message_part]})
+        return data
+    else:
+        return pd.DataFrame({'message': []})
 
 def CANMsgFromBus(msg):
         id = (hex(msg.arbitration_id))[2:].upper()
@@ -28,31 +40,36 @@ def main():
         inter = "socketcan"
         ch = "can0"
 
+        # Carregar o modelo treinado
+        model = load_model('idsmodel.h5')
+        scaler = joblib.load('scaler.pkl')
         bus = interface.Bus(channel=ch, interface=inter)
-        filter = Filter(CommunicationMatrix('./communication_matrix.json'), threshold=2, tolerance=0.03, enable_time=False)
+        filter = Filter(CommunicationMatrix('./communication_matrix.json'), threshold=3, tolerance=0.03, enable_time=False)
 
         try:
                 while True:
                         msg = CANMsgFromBus(bus.recv())
+                        msgmlp = process_single_message(bus.recv())
                         print(str(msg))
                         print("Filter test:")
                         filter_result = filter.test(msg)
                         print(filter.test(msg))
 
                         if filter_result == 'Normal':
-                                # Extrair características da mensagem
-                                features = np.array(extract_features(msg.message)).reshape(1, -1)
+                                extract = extract_features(msgmlp['message'][0])
+                                features = np.array(extract).reshape(1, -1)
                                 features_scaled = scaler.transform(features)
-
-                                # Fazer a predição com o modelo treinado
                                 y_pred_prob = model.predict(features_scaled)
-                                threshold = 0.7
-                                y_pred = (y_pred_prob > threshold).astype("int32")
+        
+                                thresholdmlp = 0.7
+                                y_pred = (y_pred_prob > thresholdmlp).astype("int32")
 
                                 if y_pred == 1:
                                         print('Intrusion detected!')
                                 else:
                                         print('Normal message')
+                        else:
+                                print('Intrusion detected!')
         except KeyboardInterrupt:
                 print("interrupted by user")
         finally:

@@ -5,9 +5,7 @@ import numpy as np
 import joblib
 import re
 from sys import argv
-
-#NOT WORKING, THE MODEL DOES NOT SAVE PROPRIETLY
-#PROBABLY THE MODEL IS NOT SAVING THE WEIGHTS
+import pandas as pd
 
 # Função para extrair características das mensagens CAN
 def extract_features(message):
@@ -22,20 +20,32 @@ def extract_features(message):
 
     return [id_int] + data_bytes
 
+def process_single_message(message):
+    match = re.match(r'.* can0 (\S+) ([RT])', message)
+    if match:
+        message_part = match.group(1)
+        label_part = match.group(2)
+        data = pd.DataFrame({'message': [message_part], 'label': [label_part]})
+        return data
+    else:
+        return pd.DataFrame({'message': [], 'label': []})
+
+def process_single_message_nolabel(message):
+    match = re.match(r'\(\d+\.\d+\)\s+can0\s+(\S+)', message)
+    if match:
+        message_part = match.group(1)
+        data = pd.DataFrame({'message': [message_part]})
+        return data
+    else:
+        return pd.DataFrame({'message': []})
+
 # Carregar o modelo treinado
 model = load_model('idsmodel.h5')
-
-# Carregar o escalador e usar os dados de treinamento para ajustá-lo
-# ERRO PROVAVELMENTE AQUI 👇
 scaler = joblib.load('scaler.pkl')
-#scaler = StandardScaler()
-#X_train_load = np.load('X_train.npy')
-#X_train = scaler.fit_transform(X_train_load)
 
 # Ler o arquivo de ataques
-attack_file = "../attacks/validation/2-fuzzing-candump-2024-07-10_184609.log" if len(argv) == 1 else argv[1]
+attack_file = "../attacks/validation/1-falsifying-candump-2024-07-10_184439.log" if len(argv) == 1 else argv[1]
 print(f"Lendo arquivo de ataques: {attack_file}")
-#print(attack_file)
 with open(attack_file, 'r') as file:
     text = file.read()
 
@@ -52,7 +62,8 @@ false_negative = 0
 msgs = text.split('\n')
 for line in msgs:
     msg = CANMsgFromline(line)
-    if msg is None: break
+    if msg is None: 
+        continue
     if msg.label is None:
         print('Unknown label')
         continue
@@ -62,13 +73,15 @@ for line in msgs:
     
     # Se o filtro classificar como normal, passar para o modelo MLP
     if filter_result == 'Normal':
-        features = np.array(extract_features(msg.message)).reshape(1, -1)
+        processedmsg = process_single_message_nolabel(line)
+        extract = extract_features(processedmsg['message'][0])
+        features = np.array(extract).reshape(1, -1)
         features_scaled = scaler.transform(features)
         y_pred_prob = model.predict(features_scaled)
         
-        threshold = 0.7
-        y_pred = (y_pred_prob > threshold).astype("int32")
-        
+        thresholdmlp = 0.7
+        y_pred = (y_pred_prob > thresholdmlp).astype("int32")
+
         if y_pred == 1:
             ids_result = 'Attack'
         else:
@@ -85,12 +98,13 @@ for line in msgs:
         false_positive += 1
     elif ids_result == 'Normal' and msg.label == 'Attack':
         false_negative += 1
-    else:
-        print('Unknown label or result')
-        exit(1)
 
 # Calcular e imprimir métricas
-total_msgs = len(msgs) - msgs.count('')
+total_msgs = true_positive + true_negative + false_positive + false_negative
+print(f"Total de mensagens: {total_msgs}")
+print(f"Total de mensagens certas: {true_positive + true_negative}")
+print(f"Total de mensagens erradas: {false_positive + false_negative}")
+print(f"Acurácia: {(true_positive + true_negative)/total_msgs}")
 print(f"True Positive: {true_positive/total_msgs}")
 print(f"True Negative: {true_negative/total_msgs}")
 print(f"False Positive: {false_positive/total_msgs}")
