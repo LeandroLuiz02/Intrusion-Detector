@@ -33,8 +33,9 @@ def CANMsgFromBus(msg):
         t = str(msg.timestamp)
         d_len = msg.dlc
         d = ''.join(format(byte, '02x') for byte in msg.data).upper()
+        d2 = int.from_bytes(msg.data)
         message = f'{pad_id}#{d}'
-        return CANMessage(t, pad_id, d, d_len, message=message)
+        return CANMessage(t, pad_id, d2, d_len, message=message)
 
 def main():
         inter = "socketcan"
@@ -45,6 +46,8 @@ def main():
         scaler = joblib.load('scaler.pkl')
         bus = interface.Bus(channel=ch, interface=inter)
         filter = Filter(CommunicationMatrix('./communication_matrix.json'), threshold=3, tolerance=0.03, enable_time=False)
+        window_size = 10
+        buffer = []
 
         try:
                 while True:
@@ -53,18 +56,23 @@ def main():
                         filter_result = filter.test(msg)
 
                         if filter_result == 'Normal':
-                                extract = extract_features(msgmlp['message'][0])
-                                features = np.array(extract).reshape(1, -1)
-                                features_scaled = scaler.transform(features)
-                                y_pred_prob = model.predict(features_scaled)
-        
-                                thresholdmlp = 0.7
-                                y_pred = (y_pred_prob > thresholdmlp).astype("int32")
+                                buffer.append(msgmlp['message'][0])
 
-                                if y_pred == 1:
-                                        print('Intrusion detected!')
-                                else:
-                                        print('Normal message')
+                                if len(buffer) > window_size:
+                                        features = np.array([extract_features(m) for m in buffer])
+                                        features_scaled = scaler.transform(features)
+                                        y_pred_prob = model.predict(features_scaled)
+                                
+                                        thresholdmlp = 0.7
+                                        y_pred = (y_pred_prob > thresholdmlp).astype("int32")
+
+                                        if np.any(y_pred == 1):
+                                                print('Intrusion detected!')
+                                        else:
+                                                print('Normal messages')
+
+                                        # Limpa o buffer
+                                        buffer = []
                         else:
                                 print('Intrusion detected!')
         except KeyboardInterrupt:
