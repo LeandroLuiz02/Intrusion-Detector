@@ -42,8 +42,6 @@ def process_single_message_nolabel(message):
 # Carregar o modelo treinado
 model = load_model('idsmodel.h5')
 scaler = joblib.load('scaler.pkl')
-window_size = 30
-buffer = []
 
 # Ler o arquivo de ataques
 attack_file = "../attacks/validation/3-impersonation-candump-2024-07-31_190254.log" if len(argv) == 1 else argv[1]
@@ -76,40 +74,30 @@ for line in msgs:
     # Se o filtro classificar como normal, passar para o modelo MLP
     if filter_result == 'Normal':
         processedmsg = process_single_message_nolabel(line)
-        buffer.append(processedmsg['message'][0])
+        extract = extract_features(processedmsg['message'][0])
+        features = np.array(extract).reshape(1, -1)
+        features_scaled = scaler.transform(features)
+        y_pred_prob = model.predict(features_scaled)
+        
+        thresholdmlp = 0.7
+        y_pred = (y_pred_prob > thresholdmlp).astype("int32")
 
-        if len(buffer) > window_size:
-            features = np.array([extract_features(m) for m in buffer])
-            features_scaled = scaler.transform(features)
-            y_pred_prob = model.predict(features_scaled)
-
-            thresholdmlp = 0.7
-            y_pred = (y_pred_prob > thresholdmlp).astype("int32")
-
-            if np.any(y_pred == 1):
-                    ids_result = 'Attack'
-                    if(msg.label == 'Attack'):
-                        true_positive += 1
-                    elif(msg.label == 'Normal'):
-                        false_positive += 1
-                    print('Intrusion detected!')
-            else:
-                    ids_result = 'Normal'
-                    if(msg.label == 'Normal'):
-                        true_negative += 1
-                    elif(msg.label == 'Attack'):
-                        false_negative += 1
-                    print('Normal messages')
-
-            # Limpa o buffer
-            buffer = []
-    else:
+        if y_pred == 1:
             ids_result = 'Attack'
-            if(msg.label == 'Attack'):
-                true_positive += 1
-            else:
-                false_negative += 1
-            print('Intrusion detected!')
+        else:
+            ids_result = 'Normal'
+    else:
+        ids_result = 'Attack'
+
+    # Atualizar contadores de métricas
+    if ids_result == 'Attack' and msg.label == 'Attack':
+        true_positive += 1
+    elif ids_result == 'Normal' and msg.label == 'Normal':
+        true_negative += 1
+    elif ids_result == 'Attack' and msg.label == 'Normal':
+        false_positive += 1
+    elif ids_result == 'Normal' and msg.label == 'Attack':
+        false_negative += 1
 
 # Calcular e imprimir métricas
 total_msgs = true_positive + true_negative + false_positive + false_negative
